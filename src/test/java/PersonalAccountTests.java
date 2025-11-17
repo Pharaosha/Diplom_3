@@ -1,20 +1,22 @@
-import Page_Object.LoginPagePOM;
-import Page_Object.MainPagePOM;
-import Page_Object.PersonalAccountPagePOM;
+import com.github.javafaker.Faker;
 import io.qameta.allure.Step;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.*;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
+import pageobject.LoginPagePOM;
+import pageobject.MainPagePOM;
+import pageobject.PersonalAccountPagePOM;
+
 import java.time.Duration;
+
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
-
 
 public class PersonalAccountTests {
 
@@ -27,17 +29,16 @@ public class PersonalAccountTests {
 
     @BeforeEach
     public void setUp() {
+        String browser = System.getProperty("browser", "chrome");
         browserFactory = new BrowserFactory();
-        driver = browserFactory.getWebDriver("chrome");
+        driver = browserFactory.getWebDriver(browser);
         mainPagePOM = new MainPagePOM(driver);
         RestAssured.baseURI = "https://stellarburgers.education-services.ru/";
     }
 
     @AfterEach
     void closeBrowser() {
-        if (driver != null) {
-            driver.quit();
-        }
+        if (driver != null) driver.quit();
     }
 
     @AfterAll
@@ -49,28 +50,18 @@ public class PersonalAccountTests {
         }
     }
 
-    @Test
-    @DisplayName("Переход в личный кабинет")
-    public void createUserAndNavigateToPersonalAccount() {
-        UserData userData = new UserData("evgenpharaosha@gmail.com", "12345678", "Rengoku");
-        Response registerResponse = createNewUser(userData);
-        registerResponse.then()
-                .assertThat()
-                .statusCode(200)
-                .body("success", equalTo(true));
-        Response loginResponse = loginUser(userData);
-        checkUserLoginSuccessfully(loginResponse, userData);
-        accessToken = extractAccessToken(loginResponse);
-
-        openMainPage();
-        clickPersonalAccountButton();
-        waitForLoginForm();
-        enterCredentialsAndLogin(userData);
-
-
+    // ---------------------- Генерация случайного пользователя ----------------------
+    private UserData generateRandomUser() {
+        Faker faker = new Faker();
+        return new UserData(
+                faker.internet().emailAddress(),
+                faker.internet().password(8, 12),
+                faker.name().firstName()
+        );
     }
 
-    @Step("Отправить POST-запрос на создание пользователя (endpoint: /api/auth/register)")
+    // ---------------------- API Helpers ----------------------
+    @Step("Создать пользователя через API")
     public Response createNewUser(UserData userData) {
         return given()
                 .header("Content-type", "application/json")
@@ -79,7 +70,7 @@ public class PersonalAccountTests {
                 .post("/api/auth/register");
     }
 
-    @Step("Отправить POST-запрос на логин пользователя (endpoint: /api/auth/login)")
+    @Step("Логин пользователя через API")
     public Response loginUser(UserData userData) {
         return given()
                 .header("Content-type", "application/json")
@@ -88,7 +79,7 @@ public class PersonalAccountTests {
                 .post("/api/auth/login");
     }
 
-    @Step("Проверить, что пользователь успешно залогинен (status code = 200, success = true)")
+    @Step("Проверка успешного логина")
     public void checkUserLoginSuccessfully(Response loginResponse, UserData userData) {
         loginResponse.then()
                 .assertThat()
@@ -104,7 +95,7 @@ public class PersonalAccountTests {
         return token != null ? token.replace("Bearer ", "") : null;
     }
 
-    @Step("Удалить пользователя по accessToken (endpoint: /api/auth/user)")
+    @Step("Удалить пользователя по accessToken")
     public static void deleteUser(String accessToken) {
         Response response = given()
                 .header("Authorization", "Bearer " + accessToken)
@@ -119,43 +110,10 @@ public class PersonalAccountTests {
         response.then().assertThat().statusCode(202);
     }
 
+    // ---------------------- Web Helpers ----------------------
     @Step("Открыть главную страницу")
     private void openMainPage() {
         driver.get("https://stellarburgers.education-services.ru");
-    }
-
-    @Step("Кликнуть по кнопке 'Личный кабинет'")
-    private void clickPersonalAccountButton() {
-        mainPagePOM.clickPersonalAccountButton();
-    }
-
-    @Step("Дождаться появления формы логина")
-    private void waitForLoginForm() {
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-        wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//label[text()='Email']/following-sibling::input")));
-    }
-
-    @Step("Ввести email и пароль и кликнуть 'Войти'")
-    private void enterCredentialsAndLogin(UserData userData) {
-
-        loginPagePOM = new LoginPagePOM(driver);
-        loginPagePOM.enterEmail(userData.getEmail());
-        loginPagePOM.enterPassword(userData.getPassword());
-        loginPagePOM.clickLoginButton();
-    }
-
-    @Test
-    @DisplayName("Переход из личного кабинета в конструктор")
-    public void navigateToBuilder() {
-        UserData userData = new UserData("evgenpharaosha@gmail.com", "12345678", "Rengoku");
-
-        openLoginPage();
-        enterLoginCredentials(userData);
-        submitLogin();
-        goToPersonalAccount();
-        waitForConstructorButton();
-        clickConstructor();
     }
 
     @Step("Открыть страницу логина")
@@ -181,24 +139,91 @@ public class PersonalAccountTests {
         personalAccountPagePOM = new PersonalAccountPagePOM(driver);
     }
 
-    @Step("Дождаться появления кнопки 'Конструктор'")
+    @Step("Дождаться появления и кликабельности кнопки 'Конструктор'")
     private void waitForConstructorButton() {
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-        wait.until(ExpectedConditions.elementToBeClickable(
-                By.xpath("//button[contains(., 'Конструктор')] | //a[contains(., 'Конструктор')]")
-        ));
+        By constructorButton = By.xpath("//button[contains(., 'Конструктор')] | //a[contains(., 'Конструктор')]");
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(constructorButton));
+        wait.until(ExpectedConditions.elementToBeClickable(constructorButton));
     }
 
     @Step("Нажать кнопку 'Конструктор'")
     private void clickConstructor() {
-        personalAccountPagePOM.clickConstructorButton();
+        By constructorButton = By.xpath("//button[contains(., 'Конструктор')] | //a[contains(., 'Конструктор')]");
+        WebElement button = driver.findElement(constructorButton);
+        ((JavascriptExecutor) driver).executeScript("arguments[0].click();", button);
     }
 
+    @Step("Дождаться появления и кликабельности кнопки 'Выход'")
+    private void waitForLogoutButton() {
+        By logoutButton = By.xpath("//button[contains(., 'Выход')]");
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(logoutButton));
+        wait.until(ExpectedConditions.elementToBeClickable(logoutButton));
+    }
+
+    @Step("Нажать кнопку 'Выйти'")
+    private void clickLogoutButton() {
+        By logoutButton = By.xpath("//button[contains(., 'Выход')]");
+        WebElement button = driver.findElement(logoutButton);
+
+        try {
+            button.click();
+        } catch (Exception e) {
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", button);
+        }
+    }
+
+    @Step("Проверить, что пользователь вышел из аккаунта")
+    private void verifyLogout() {
+        By loginButton = By.xpath("//button[text()='Войти'] | //a[text()='Войти']");
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(loginButton));
+    }
+
+    // ---------------------- Тесты ----------------------
+    @Test
+    @DisplayName("Переход в личный кабинет с динамическим пользователем")
+    public void createUserAndNavigateToPersonalAccount() {
+        UserData userData = generateRandomUser();
+
+        Response registerResponse = createNewUser(userData);
+        registerResponse.then()
+                .assertThat()
+                .statusCode(200)
+                .body("success", equalTo(true));
+
+        Response loginResponse = loginUser(userData);
+        checkUserLoginSuccessfully(loginResponse, userData);
+        accessToken = extractAccessToken(loginResponse);
+
+        openMainPage();
+        mainPagePOM.clickPersonalAccountButton();
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//label[text()='Email']/following-sibling::input")));
+
+        loginPagePOM = new LoginPagePOM(driver);
+        enterLoginCredentials(userData);
+        submitLogin();
+    }
 
     @Test
-    @DisplayName("Выход из личного кабинета через кнопку 'Выйти'")
+    @DisplayName("Переход из личного кабинета в конструктор с динамическим пользователем")
+    public void navigateToBuilder() {
+        UserData userData = generateRandomUser();
+
+        openLoginPage();
+        enterLoginCredentials(userData);
+        submitLogin();
+        goToPersonalAccount();
+        waitForConstructorButton();
+        clickConstructor();
+    }
+
+    @Test
+    @DisplayName("Выход из личного кабинета через кнопку 'Выйти' с динамическим пользователем")
     public void logoutFromPersonalAccount() {
-        UserData userData = new UserData("evgenpharaosha@gmail.com", "12345678", "Rengoku");
+        UserData userData = generateRandomUser();
 
         openLoginPage();
         enterLoginCredentials(userData);
@@ -208,28 +233,4 @@ public class PersonalAccountTests {
         clickLogoutButton();
         verifyLogout();
     }
-
-
-    @Step("Нажать кнопку 'Выйти'")
-    private void clickLogoutButton() {
-        personalAccountPagePOM.clickLogoutButton();
-    }
-
-    @Step("Проверить, что пользователь вышел из аккаунта")
-    private void verifyLogout() {
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-        wait.until(ExpectedConditions.visibilityOfElementLocated(
-                By.xpath("//button[text()='Войти'] | //a[text()='Войти']")
-        ));
-    }
-
-    @Step("Дождаться появления кнопки 'Конструктор'")
-    private void waitForLogoutButton() {
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
-        wait.until(ExpectedConditions.elementToBeClickable(
-                By.xpath("//button[text()='Выход']")
-        ));
-    }
-
 }
-

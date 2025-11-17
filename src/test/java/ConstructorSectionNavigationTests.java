@@ -1,13 +1,12 @@
-import Page_Object.*;
-import Page_Object.ConstructorPagePOM;
+import pageobject.*;
+import pageobject.ConstructorPagePOM;
 import io.qameta.allure.Step;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.*;
 import org.openqa.selenium.WebDriver;
-
+import com.github.javafaker.Faker;
 
 import static io.restassured.RestAssured.given;
-
 
 public class ConstructorSectionNavigationTests {
 
@@ -17,15 +16,25 @@ public class ConstructorSectionNavigationTests {
     private MainPagePOM mainPagePOM;
     private LoginPagePOM loginPagePOM;
     private BrowserFactory browserFactory;
-
-
+    private UserData userData;
 
     @BeforeEach
     void setUp() {
+
+        Faker faker = new Faker();
+        String randomEmail = faker.internet().emailAddress();
+        String randomPassword = faker.internet().password(8, 12);
+        String randomName = faker.name().firstName();
+        userData = new UserData(randomEmail, randomPassword, randomName);
+
+        String browser = System.getProperty("browser", "chrome");
         browserFactory = new BrowserFactory();
-        driver = browserFactory.getWebDriver("chrome");
+        driver = browserFactory.getWebDriver(browser);
         mainPagePOM = new MainPagePOM(driver);
         constructorPagePOM = new ConstructorPagePOM(driver);
+
+        loginUser(userData);
+        openConstructor();
     }
 
     @AfterEach
@@ -44,16 +53,24 @@ public class ConstructorSectionNavigationTests {
     }
 
     @Test
-    @DisplayName("Проверка переходов между разделами конструктора")
-    public void constructorSectionNavigation() {
-        UserData userData = new UserData("evgenpharaosha@gmail.com", "12345678", "Rengoku");
+    @DisplayName("Переход в раздел 'Булки'")
+    public void navigateToBunsTest() {
+        constructorPagePOM.clickBunsTab();
+        Assertions.assertTrue(constructorPagePOM.isTabActive("Булки"), "Вкладка 'Булки' должна быть активна");
+    }
 
-        loginUser(userData);
-        openConstructor();
+    @Test
+    @DisplayName("Переход в раздел 'Соусы'")
+    public void navigateToSaucesTest() {
+        constructorPagePOM.clickSaucesTab();
+        Assertions.assertTrue(constructorPagePOM.isTabActive("Соусы"), "Вкладка 'Соусы' должна быть активна");
+    }
 
-        navigateToBuns();
-        navigateToSauces();
-        navigateToFillings();
+    @Test
+    @DisplayName("Переход в раздел 'Начинки'")
+    public void navigateToFillingsTest() {
+        constructorPagePOM.clickFillingsTab();
+        Assertions.assertTrue(constructorPagePOM.isTabActive("Начинки"), "Вкладка 'Начинки' должна быть активна");
     }
 
     @Step("Логинимся под пользователем")
@@ -67,27 +84,7 @@ public class ConstructorSectionNavigationTests {
 
     @Step("Открываем конструктор")
     private void openConstructor() {
-        mainPagePOM = new MainPagePOM(driver);
         mainPagePOM.clickConstructorButton();
-        constructorPagePOM = new ConstructorPagePOM(driver);
-    }
-
-    @Step("Перейти в раздел 'Булки'")
-    private void navigateToBuns() {
-        constructorPagePOM.clickBunsTab();
-        Assertions.assertTrue(constructorPagePOM.isTabActive("Булки"), "Вкладка 'Булки' не активна");
-    }
-
-    @Step("Перейти в раздел 'Соусы'")
-    private void navigateToSauces() {
-        constructorPagePOM.clickSaucesTab();
-        Assertions.assertTrue(constructorPagePOM.isTabActive("Соусы"), "Вкладка 'Соусы' не активна");
-    }
-
-    @Step("Перейти в раздел 'Начинки'")
-    private void navigateToFillings() {
-        constructorPagePOM.clickFillingsTab();
-        Assertions.assertTrue(constructorPagePOM.isTabActive("Начинки"), "Вкладка 'Начинки' не активна");
     }
 
     public static void deleteUser(String accessToken) {
@@ -103,6 +100,4 @@ public class ConstructorSectionNavigationTests {
 
         response.then().assertThat().statusCode(202);
     }
-
-
 }

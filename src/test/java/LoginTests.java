@@ -1,7 +1,6 @@
-import Page_Object.ForgotPasswordPagePOM;
-import Page_Object.LoginPagePOM;
-import Page_Object.RegisterPagePOM;
-import Page_Object.MainPagePOM;
+import pageobject.ForgotPasswordPagePOM;
+import pageobject.LoginPagePOM;
+import pageobject.MainPagePOM;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.*;
 import org.openqa.selenium.By;
@@ -9,133 +8,87 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import java.time.Duration;
-import static io.restassured.RestAssured.given;
+import com.github.javafaker.Faker;
 
 public class LoginTests {
 
     private WebDriver driver;
-    private RegisterPagePOM registerPagePOM;
     private MainPagePOM mainPagePOM;
     private LoginPagePOM loginPagePOM;
     private ForgotPasswordPagePOM forgotPasswordPagePOM;
-    private static String accessToken;
     private BrowserFactory browserFactory;
+    private static String accessToken;
+    private static UserData testUser;
 
     @BeforeEach
     void setUp() {
+        String browser = System.getProperty("browser", "chrome"); // chrome по умолчанию
         browserFactory = new BrowserFactory();
-        driver = browserFactory.getWebDriver("chrome");
-        registerPagePOM = new RegisterPagePOM(driver);
+        driver = browserFactory.getWebDriver(browser);
         mainPagePOM = new MainPagePOM(driver);
         forgotPasswordPagePOM = new ForgotPasswordPagePOM(driver);
     }
 
-    @AfterEach
-    void closeBrowser() {
-        if (driver != null) {
-            driver.quit();
-        }
-    }
+    @BeforeEach
+    void createTestUser() {
 
-    @AfterAll
-    @DisplayName("Удаление пользователя после тестов")
-    public static void tearDown() {
-        if (accessToken != null && !accessToken.isEmpty()) {
-            deleteUser(accessToken);
-        }
-    }
+        Faker faker = new Faker();
+        String email = faker.internet().emailAddress();
+        String password = faker.internet().password(8, 12);
+        String name = faker.name().firstName();
 
-    @Test
-    @DisplayName("Вход через кнопку в форме регистрации с безопасным ожиданием")
-    public void loginFromRegisterPage() {
-        driver.get("https://stellarburgers.education-services.ru/register");
-        String email = "evgenpharaosha@gmail.com";
-        String password = "12345678";
+        testUser = new UserData(email, password, name);
 
+        Response createResponse = UserApi.createNewUser(testUser);
+        Assertions.assertEquals(200, createResponse.getStatusCode(), "Пользователь не был создан через API");
 
-        registerPagePOM.enterName("Женя");
-        registerPagePOM.enterEmail(email);
-        registerPagePOM.enterPassword(password);
-        registerPagePOM.clickRegister();
-
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.urlContains("/login"));
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//label[text()='Email']/following-sibling::input")));
-
-        loginPagePOM = new LoginPagePOM(driver);
-        loginPagePOM.enterEmail(email);
-        loginPagePOM.enterPassword(password);
-        loginPagePOM.clickLoginButton();
-
-        Response loginResponse = given()
-                .header("Content-type", "application/json")
-                .body("{\"email\":\"" + email + "\",\"password\":\"" + password + "\"}")
-                .when()
-                .post("https://stellarburgers.education-services.ru/api/auth/login");
-
-        accessToken = extractAccessToken(loginResponse);
+        Response loginResponse = UserApi.loginUser(testUser);
+        accessToken = UserApi.extractAccessToken(loginResponse);
         Assertions.assertNotNull(accessToken, "accessToken не должен быть null");
     }
 
-    public static String extractAccessToken(Response response) {
-        String token = response.then().extract().path("accessToken");
-        return token != null ? token.replace("Bearer ", "") : null;
-    }
+    @AfterEach
+    void closeBrowser() {
+        if (driver != null) driver.quit();
 
-    public static void deleteUser(String accessToken) {
-        Response response = given()
-                .header("Authorization", "Bearer " + accessToken)
-                .when()
-                .delete("https://stellarburgers.education-services.ru/api/auth/user");
-
-        if (response.statusCode() != 202) {
-            System.out.println("Ошибка при удалении пользователя:");
-            response.prettyPrint();
+        if (accessToken != null) {
+            UserApi.deleteUser(accessToken);
         }
-
-        response.then().assertThat().statusCode(202);
     }
 
     @Test
     @DisplayName("Вход через кнопку 'Войти в аккаунт' на главной")
-    public void loginFromMainButton() {
-        String email = "evgenpharaosha@gmail.com";
-        String password = "12345678";
-
+    void loginFromMainButton() {
         driver.get("https://stellarburgers.education-services.ru");
         mainPagePOM.clickLoginButtonMain();
+
         loginPagePOM = new LoginPagePOM(driver);
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//label[text()='Email']/following-sibling::input")));
 
-        loginPagePOM.enterEmail(email);
-        loginPagePOM.enterPassword(password);
+        loginPagePOM.enterEmail(testUser.getEmail());
+        loginPagePOM.enterPassword(testUser.getPassword());
         loginPagePOM.clickLoginButton();
     }
 
     @Test
     @DisplayName("Вход через кнопку Личный кабинет")
-    public void loginFromPersonalAccountButton() {
-        String email = "evgenpharaosha@gmail.com";
-        String password = "12345678";
-
+    void loginFromPersonalAccountButton() {
         driver.get("https://stellarburgers.education-services.ru");
         mainPagePOM.clickPersonalAccountButton();
+
         loginPagePOM = new LoginPagePOM(driver);
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//label[text()='Email']/following-sibling::input")));
 
-        loginPagePOM.enterEmail(email);
-        loginPagePOM.enterPassword(password);
+        loginPagePOM.enterEmail(testUser.getEmail());
+        loginPagePOM.enterPassword(testUser.getPassword());
         loginPagePOM.clickLoginButton();
     }
 
     @Test
     @DisplayName("Вход через кнопку Восстановить пароль")
-    public void loginFromResetPasswordButton() {
-        String email = "evgenpharaosha@gmail.com";
-        String password = "12345678";
-
+    void loginFromResetPasswordButton() {
         driver.get("https://stellarburgers.education-services.ru/login");
 
         loginPagePOM = new LoginPagePOM(driver);
@@ -146,8 +99,8 @@ public class LoginTests {
         forgotPasswordPagePOM = new ForgotPasswordPagePOM(driver);
 
         forgotPasswordPagePOM.clickLoginLinkButton();
-        loginPagePOM.enterEmail(email);
-        loginPagePOM.enterPassword(password);
+        loginPagePOM.enterEmail(testUser.getEmail());
+        loginPagePOM.enterPassword(testUser.getPassword());
         loginPagePOM.clickLoginButton();
     }
 }
