@@ -3,11 +3,7 @@ import pageobject.LoginPagePOM;
 import pageobject.MainPagePOM;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.*;
-import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
-import java.time.Duration;
 import com.github.javafaker.Faker;
 
 public class LoginTests {
@@ -63,9 +59,7 @@ public class LoginTests {
         mainPagePOM.clickLoginButtonMain();
 
         loginPagePOM = new LoginPagePOM(driver);
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//label[text()='Email']/following-sibling::input")));
-
+        loginPagePOM.waitForLoginPage();
         loginPagePOM.enterEmail(testUser.getEmail());
         loginPagePOM.enterPassword(testUser.getPassword());
         loginPagePOM.clickLoginButton();
@@ -78,9 +72,7 @@ public class LoginTests {
         mainPagePOM.clickPersonalAccountButton();
 
         loginPagePOM = new LoginPagePOM(driver);
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//label[text()='Email']/following-sibling::input")));
-
+        loginPagePOM.waitForLoginPage();
         loginPagePOM.enterEmail(testUser.getEmail());
         loginPagePOM.enterPassword(testUser.getPassword());
         loginPagePOM.clickLoginButton();
@@ -92,9 +84,7 @@ public class LoginTests {
         driver.get("https://stellarburgers.education-services.ru/login");
 
         loginPagePOM = new LoginPagePOM(driver);
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(5));
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//label[text()='Email']/following-sibling::input")));
-
+        loginPagePOM.waitForLoginPage();
         loginPagePOM.clickResetPasswordButton();
         forgotPasswordPagePOM = new ForgotPasswordPagePOM(driver);
 

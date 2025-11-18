@@ -27,6 +27,9 @@ public class LoginPagePOM {
         this.wait = new WebDriverWait(driver, Duration.ofSeconds(10));
     }
 
+    public void waitForLoginPage() {
+        wait.until(ExpectedConditions.visibilityOfElementLocated(emailField));
+    }
 
     public void enterEmail(String email) {
         WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(emailField));
@@ -49,5 +52,11 @@ public class LoginPagePOM {
         WebElement btn = wait.until(ExpectedConditions.elementToBeClickable(resetPasswordButton));
         btn.click();
     }
+
+    public void openLoginPage() {
+        driver.get("https://stellarburgers.education-services.ru/login");
+            }
+
+    public void submitLogin() { driver.findElement(loginButton).click(); }
 
 }

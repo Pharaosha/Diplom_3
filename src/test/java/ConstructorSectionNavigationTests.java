@@ -1,12 +1,10 @@
 import pageobject.*;
 import pageobject.ConstructorPagePOM;
 import io.qameta.allure.Step;
-import io.restassured.response.Response;
 import org.junit.jupiter.api.*;
 import org.openqa.selenium.WebDriver;
 import com.github.javafaker.Faker;
 
-import static io.restassured.RestAssured.given;
 
 public class ConstructorSectionNavigationTests {
 
@@ -48,7 +46,7 @@ public class ConstructorSectionNavigationTests {
     @DisplayName("Удаление пользователя после тестов")
     public static void tearDown() {
         if (accessToken != null && !accessToken.isEmpty()) {
-            deleteUser(accessToken);
+            UserApi.deleteUser(accessToken);
         }
     }
 
@@ -87,17 +85,4 @@ public class ConstructorSectionNavigationTests {
         mainPagePOM.clickConstructorButton();
     }
 
-    public static void deleteUser(String accessToken) {
-        Response response = given()
-                .header("Authorization", "Bearer " + accessToken)
-                .when()
-                .delete("https://stellarburgers.education-services.ru/api/auth/user");
-
-        if (response.statusCode() != 202) {
-            System.out.println("Ошибка при удалении пользователя:");
-            response.prettyPrint();
-        }
-
-        response.then().assertThat().statusCode(202);
-    }
 }
